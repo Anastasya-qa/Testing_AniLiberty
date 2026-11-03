@@ -1,108 +1,127 @@
+import time
 import allure
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
 
 
 class AniLibertyPages:
-    """Класс страниц для проекта AniLiberty (Page Object Model)"""
+    """Класс страниц для проекта AniLiberty"""
 
     def __init__(self, driver: WebDriver) -> None:
         self.driver = driver
-        self.wait = WebDriverWait(driver, 10)
 
     @allure.step("Открыть главную страницу авторизации AniLiberty")
     def open_home_page(self) -> None:
         self.driver.get("https://www.aniliberty.top/app/auth/login")
 
-    @allure.step("Выполнить авторизацию с логином: {login}")
+    @allure.step("Выполнить авторизацию с логином")
     def login(self, login: str, password: str) -> None:
-        login_input = self.wait.until(
-            EC.presence_of_element_located((By.NAME, "login"))
-        )
+        login_input = self.driver.find_element(By.NAME, "login")
         login_input.clear()
         login_input.send_keys(login)
 
-        password_input = self.wait.until(
-            EC.presence_of_element_located((By.NAME, "current-password"))
-        )
+        password_input = self.driver.find_element(By.NAME, "current-password")
         password_input.clear()
         password_input.send_keys(password)
 
-        submit_btn = self.wait.until(
-            EC.element_to_be_clickable(
-                (By.CSS_SELECTOR, "button.v-btn, button[type='button']")
-            )
+        submit_btn = self.driver.find_element(
+            By.CSS_SELECTOR, "button.v-btn, button[type='button']"
         )
         submit_btn.click()
 
-        self.wait.until(lambda driver: "auth/login" not in driver.current_url)
+        time.sleep(2)
 
-    @allure.step("Ввести поисковый запрос: {query}")
+    @allure.step("Кликнуть по иконке лупы для открытия поиска")
+    def open_search_modal(self) -> None:
+        search_btn = self.driver.find_element(
+            By.CSS_SELECTOR,
+            "button.v-btn.v-theme--dark.bg-transparent:nth-of-type(2)"
+        )
+        search_btn.click()
+
+        time.sleep(1)
+
+    @allure.step("Ввести поисковый запрос")
     def search_title(self, query: str) -> None:
-        input_field = self.wait.until(
-            EC.presence_of_element_located(
-                (By.CSS_SELECTOR, "input[placeholder*='Введите название аниме']")
-            )
+        input_field = self.driver.find_element(
+            By.CSS_SELECTOR, "input.v-field__input"
         )
         input_field.clear()
         input_field.send_keys(query)
 
-    @allure.step("Выбрать первый результат из списка поиска")
-    def select_first_search_result(self) -> None:
-        first_item = self.wait.until(
-            EC.element_to_be_clickable(
-                (By.CSS_SELECTOR, ".v-list-item, .v-card")
-            )
-        )
-        first_item.click()
+        time.sleep(3)
 
-    @allure.step("Добавить аниме в избранное (клик по кнопке со звездой)")
-    def click_star_icon(self) -> None:
-
-        star_btn = self.wait.until(
-            EC.element_to_be_clickable(
-                (
-                    By.CSS_SELECTOR,
-                    "button.v-btn svg path[d*='M9.5,3A6.5,6.5']",
-                )
-            )
+    @allure.step("Выбрать первый результат из списка поиска "
+                 "по внутренней ссылке")
+    def open_first_search_result_by_href(self) -> None:
+        results = self.driver.find_elements(
+            By.CSS_SELECTOR, "a[role='listitem'][href*='/episodes']"
         )
-        star_btn.click()
+
+        first_item = results[0]
+
+        link_href = first_item.get_attribute("href")
+        print(f"\n---> НАШЛИ ССЫЛКУ В ПОИСКЕ: {link_href}")
+
+        self.driver.get(link_href)
+        time.sleep(3)
+
+    @allure.step("Проверить, что кнопка «Смотреть с 1 эпизода» отображается")
+    def is_watch_button_displayed(self) -> bool:
+        time.sleep(2)
+        watch_btn = self.driver.find_element(
+            By.CSS_SELECTOR, "a[href*='/anime/video/episode/']"
+        )
+        return watch_btn.is_displayed()
+
+    @allure.step("Добавить первый релиз в избранное и проверить, "
+                 "что звезда стала красной")
+    def click_and_check_star_in_catalog(self) -> bool:
+        self.driver.get("https://www.aniliberty.top/anime/catalog/")
+        time.sleep(3)
+
+        star_selector = "div.v-layout.mt-4 button.v-btn[style*='width: 40px']"
+
+        star_btn = self.driver.find_element(By.CSS_SELECTOR, star_selector)
+
+        if "bg-secondary" in star_btn.get_attribute("class"):
+            self.driver.execute_script("arguments[0].click();", star_btn)
+            time.sleep(2)
+            star_btn = self.driver.find_element(By.CSS_SELECTOR, star_selector)
+
+        self.driver.execute_script("arguments[0].click();", star_btn)
+        time.sleep(2)
+
+        updated_star_btn = self.driver.find_element(By.CSS_SELECTOR,
+                                                    star_selector)
+        return "bg-secondary" in updated_star_btn.get_attribute("class")
 
     @allure.step("Перейти в раздел 'Избранное'")
     def go_to_favorites(self) -> None:
-        # Переход в избранное (можно через меню профиля или прямой URL)
-        profile_menu = self.wait.until(
-            EC.element_to_be_clickable(
-                (By.CSS_SELECTOR, ".user-avatar, .v-avatar")
-            )
+        profile_menu = self.driver.find_element(
+            By.CSS_SELECTOR, ".user-avatar, .v-avatar"
         )
         profile_menu.click()
-        fav_link = self.wait.until(
-            EC.element_to_be_clickable(
-                (By.XPATH, "//a[contains(@href, 'favorites') or contains(text(), 'Избранное')]")
-            )
+
+        time.sleep(1)
+
+        fav_link = self.driver.find_element(
+            By.XPATH, "//a[contains(@href, 'favorites') "
+            "or contains(text(), 'Избранное')]"
         )
         fav_link.click()
 
-    @allure.step("Выйти из аккаунта (логаут)")
+    @allure.step("Выйти из аккаунта")
     def logout(self) -> None:
-        # Открытие меню профиля (иконка аватара или профиля)
-        profile_menu = self.wait.until(
-            EC.element_to_be_clickable(
-                (By.CSS_SELECTOR, ".user-avatar, .v-avatar")
-            )
+        profile_menu = self.driver.find_element(
+            By.CSS_SELECTOR, ".user-avatar, .v-avatar"
         )
         profile_menu.click()
 
-        # Кнопка «Выход» на основе найденного элемента v-list-item-title из разметки
-        logout_btn = self.wait.until(
-            EC.element_to_be_clickable((
-                    By.XPATH,
-                    "//div[contains(@class, 'v-list-item-title') and text()='Выход']",
-                )
-            )
+        time.sleep(3)
+
+        logout_btn = self.driver.find_element(
+            By.XPATH,
+            "//div[contains(@class, 'v-list-item-title') and text()='Выход']",
         )
-        logout_btn.click()
+        self.driver.execute_script("arguments[0].click();", logout_btn)
